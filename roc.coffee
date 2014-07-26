@@ -35,10 +35,7 @@ rocspect = do ->
         else
             cleanRocNode(x)
     (x) ->
-        y = cleanRoc(x)
-        log _.keys(y)
-        inspect y
-
+        inspect cleanRoc(x)
 
 followTokenLinks = (x) ->
     current = x
@@ -86,7 +83,6 @@ getPreDefineTokens = (tokens) ->
 joinTokens = (tokens) ->
     _.map(tokens, (x) -> if x.raw then x.raw else x.value).join('')
 
-
 getDefTokens = (tree) ->
     matching = _.chain(tree.body)
         .filter( (x) -> _.has(x, 'expression') and x.expression.type is 'CallExpression' )
@@ -105,7 +101,6 @@ getDefTokens = (tree) ->
 
     lastToken.prev.next = undefined
     followTokenLinks(tokenStart)
-
 
 getPreDefineSrc = (src) ->
     rocTree = rocambole.parse src
@@ -173,8 +168,7 @@ define(['underscore', 'jquery'], function(_, $) {
 });
 """
 
-
-
+rocspect rocambole.parse(src5).body
 
 module.exports = {
     doUnAmd: doUnAmd

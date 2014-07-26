@@ -203,11 +203,12 @@ unAmd = do ->
     getDefinedDependencies = (defineCall) ->
         defArgs = defineCall.get('arguments')
         if defArgs.count() is 1
-            return []
+            return m.vector()
         scriptDeps = defArgs.get([0, 'elements']).pluck 'value'
         scriptDepNames = defArgs.get([1, 'params']).pluck 'name'
-        requires = _.map _.zip(scriptDepNames, scriptDeps), (x) -> makeRequireCall(x[0], x[1])
-        requires = _.map requires, (x) -> x.val()
+        requires = _.chain( _.zip(scriptDepNames, scriptDeps) )
+                        .map( (x) -> makeRequireCall(x[0], x[1]).val() )
+                        .value()
         requires = m.into m.vector(), requires
         requires
 

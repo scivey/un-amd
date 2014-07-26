@@ -74,11 +74,8 @@ skipAll = do ->
 
 doMain = ->
     loadDir './tmp/src', (err, scripts) ->
-        # toSkip = ['analytics.js', 'diagnostics.js', 'main.js', 'makeSpin.js', 'reload.js', 'tables.js']
         toSkip = ['main.js', 'tables.js']
-
         scripts = skipAll(toSkip, scripts)
-        # scripts = _.first scripts, 40
         log scripts
         procAll scripts
 
@@ -89,15 +86,6 @@ doModels = ->
 
 doTests = ->
     loadDir './tmp/src/test', (err, scripts) ->
-        toSkip = [
-            'testAddBlogModal.js'
-            'testAddEloquaModal.js'
-            'testAddMarketoModal.js'
-            'testAnalytics.js'
-            'testAnalyticsViews'
-        ]
-        # scripts = skipAll toSkip, scripts
-        # scripts = _.first scripts, 5
         log scripts
         procAll scripts
 
@@ -112,25 +100,3 @@ doHelpers = ->
 
 doHelpers()
 
-# handleFile = (filePath, cb) ->
-#     fs.readFile filePath, 'utf8', (err, res) ->
-#         return cb(err) if err?
-#         processed = unAmdText(res)
-#         fs.writeFile mapDest(filePath), processed, (err) ->
-#             cb null
-
-#     getDirScripts dirPath, (err, scripts) ->
-#         scripts = _.filter scripts, (f) ->
-#             path.basename(f).indexOf('_') isnt 0
-#         scripts = _.first scripts, 5
-#         async.each scripts, handleFile, (err) ->
-#             cb null
-
-# module.exports = {
-#     getDirScripts: getDirScripts
-#     inDest: inDest
-#     mapDest: mapDest
-#     handleFile: handleFile
-#     loadDir: loadDir
-#     processFile: processFile
-# }
