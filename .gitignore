@@ -2,3 +2,4 @@ node_modules
 *.log
 mori-tree.sublime-project
 mori-tree.sublime-workspace
+tmp

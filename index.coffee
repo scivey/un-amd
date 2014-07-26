@@ -8,12 +8,14 @@ esprima = require 'esprima'
 escodegen = require 'escodegen'
 jsfmt = require 'jsfmt'
 
-mparse = (src) ->
-    m.cljToJs(esprima.parse(src))
+mparse = (src, opts) ->
+    opts ?= {}
+    m.cljToJs esprima.parse(src, opts)
 
-mgen = (tree) ->
+mgen = (tree, opts) ->
+    opts ?= {}
     tree = Tree.valIfTree(tree)
-    escodegen.generate m.cljToJs(tree)
+    escodegen.generate m.cljToJs(tree, opts)
 
 nSplit = (n, aList) ->
     _.chain(_.range(0, aList.length))
@@ -39,10 +41,13 @@ AST.isTree = Tree.isTree
 
 _.extend AST.prototype, Tree.prototype
 
-
 AST.parse = (src) ->
-    val = mparse(src)
+    val = mparse src, {
+        comments: true
+    }
     return new AST(val)
+
+
 
 h = do ->
     types = [
@@ -178,8 +183,8 @@ useStrict = do ->
     ->
         stmt
 
-AST::generate = ->
-    mgen @val()
+AST::generate = (opts) ->
+    mgen @val(), opts
 
 AST::genFmt = ->
     jsfmt.format @generate()
@@ -255,7 +260,84 @@ define(['underscore', 'jquery', 'backbone'], function(_, $, Backbone) {
 });
 """
 
+fs = require 'fs'
+path = require 'path'
+async = require 'async'
 
-good = unAmd(src2)
 
-console.log good.genFmt()
+
+
+
+
+unAmdText = (fileSrc) ->
+    unAmd(fileSrc).generate {
+        format:
+            indent:
+                style: '    '
+        comment: true
+    }
+
+
+src5 = """
+define(['underscore', 'jquery'], function(_, $) {
+    var x = Backbone.Model.extend({
+        foo: function() {
+            this._baz = true;
+        }
+    });
+
+    // this is a comment
+    var y = Backbone.Model.extend({
+        bat: function() {
+            this._bar = true;
+        }
+    });
+
+    // this is another comment.
+    return {
+        band: band
+    };
+});
+"""
+
+doTest = do ->
+ 
+    getDirScripts = (dirPath, cb) ->
+        fs.readdir dirPath, (err, files) ->
+            return cb(err) if err?
+            files = _.filter files, (f) ->
+                path.extname(f).indexOf('js') isnt -1
+            files = _.map files, (f) ->
+                path.join dirPath, f
+            cb null, files
+
+    inDest = (fileName) ->
+        path.join __dirname, 'tmp/dest', fileName
+
+    mapDest = (filePath) ->
+        inDest path.basename(filePath)
+
+    handleFile = (filePath, cb) ->
+        fs.readFile filePath, 'utf8', (err, res) ->
+            return cb(err) if err?
+            processed = unAmdText(res)
+            fs.writeFile mapDest(filePath), processed, (err) ->
+                cb null
+
+    (dirPath, cb) ->
+        getDirScripts dirPath, (err, scripts) ->
+            scripts = _.filter scripts, (f) ->
+                path.basename(f).indexOf('_') isnt 0
+            scripts = _.first scripts, 5
+            async.each scripts, handleFile, (err) ->
+                cb null
+
+doTest './tmp/src', (err) ->
+    log '{done}'
+
+
+
+
+
+
+
