@@ -15,38 +15,55 @@ inspect = do ->
     (ref) ->
         console.log util.inspect(ref, opts)
 
-helpers = h = {
-    negate: _.curry( (fn, x) -> not fn(x) )
-    
+negate = (fn, x) ->
+    result = fn(x)
+    if result then false else true
+
+h = {
+    negate: _.curry( negate )
     isSimple: (x) -> return true unless _.isObject(x)
-    
-    notSimple: h.negate(h.isSimple)
-    
     parse10: (x) -> parseInt(x)
-
     includes: _.curry( (y, x) -> x.indexOf(y) isnt -1 )
-
-    isIntStr: do ->
-        numeric = /^[0-9]+$/igm
-        (x) -> numeric.test(x)
-    
-    notIntStr: h.negate(h.isIntStr)
-    
-    maybeIntStr: (x) ->
-        if _.isNumber(x) then return x
-        if h.notIntStr(x) then return x
-        return h.parse10(x)
-
-    keyString: (x) ->
-        return x unless h.includes('.', x)
-        parts = _.map x.split('.'), (v) ->
-            h.maybeIntStr(v)
-        parts
-
 }
 
+h.isIntStr = do ->
+    numeric = /^[0-9]+$/igm
+    (x) -> 
+        numeric.test(x)
 
-module.exports = _.extend helpers, {
+h.flatten1 = (x) ->
+    shallow = true
+    _.flatten x, shallow
+
+_.extend h, {
+    notIntStr: h.negate(h.isIntStr)
+    notSimple: h.negate(h.isSimple)
+}
+
+h.extend = (parts...) ->
+    result = {}
+    args = h.flatten1 [result, parts]
+    _.extend.apply _, args
+    result
+
+h.maybeIntStr = (x) ->
+    if _.isNumber(x) then return x
+    if h.notIntStr(x) then return x
+    return h.parse10(x)
+
+
+
+h.keyString = (x) ->
+    return x unless h.includes('.', x)
+    parts = _.map x.split('.'), (v) ->
+        h.maybeIntStr(v)
+    parts
+
+
+output = h.extend h, {
     kamelKey: kamelKey
     inspect: inspect
+    log: _.bind(console.log, console)
 }
+
+module.exports = output
