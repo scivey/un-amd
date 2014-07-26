@@ -194,8 +194,11 @@ AST::toProgram = ->
 unAmd = do ->
 
     getDefinedDependencies = (defineCall) ->
-        scriptDeps = defineCall.get(['arguments', 0, 'elements']).map (x) -> m.get(x, 'value')
-        scriptDepNames = defineCall.get(['arguments', 1, 'params']).map (x) -> m.get(x, 'name')
+        defArgs = defineCall.get('arguments')
+        if defArgs.count() is 1
+            return []
+        scriptDeps = defArgs.get([0, 'elements']).map (x) -> m.get(x, 'value')
+        scriptDepNames = defArgs.get([1, 'params']).map (x) -> m.get(x, 'name')
         requires = _.map _.zip(scriptDepNames, scriptDeps), (x) -> makeRequireCall(x[0], x[1])
         requires = _.map requires, (x) -> x.val()
         requires = m.into m.vector(), requires
@@ -209,7 +212,9 @@ unAmd = do ->
         ).nth(0)
 
     getDefineBody = (defineCall) ->
-        defineCall.get ['arguments', 1, 'body', 'body']
+        defArgs = defineCall.get('arguments')
+        bodyIndex = defArgs.count() - 1
+        defArgs.get [bodyIndex, 'body', 'body']
 
     (src) ->
         t = AST(src)
