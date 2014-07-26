@@ -117,8 +117,13 @@ Tree::hasDeep = (pred) ->
 Tree::filter = (pred) ->
     errNone()
 
-Tree::map = (mapFn) ->
+Tree::map = (fn) ->
+    mapFn = (el) =>
+        fn @lift(el)
     m.cljToJs(m.map mapFn, @val())
+
+Tree::pluck = (prop) ->
+    @map (x) -> x.get(prop)
 
 Tree::equals = (other) ->
     ownVal = @val()

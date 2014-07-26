@@ -11,4 +11,5 @@ compile:
 	coffee -c ./
 
 tryit: cleantmp
-	coffee index.coffee
+	coffee asyncProc.coffee
+

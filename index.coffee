@@ -88,7 +88,8 @@ h = do ->
             type = m.get(node, 'type')
             utils.includes('Expression', type) and type isnt 'ExpressionStatement'
         stmt: (node) ->
-            utils.includes('Statement', m.get(node, 'type'))
+            type = m.get(node, 'type')
+            utils.includes('Statement', type) or utils.includes('Variable', type)
     }
 
 
@@ -198,12 +199,13 @@ AST::toProgram = ->
 
 unAmd = do ->
 
+
     getDefinedDependencies = (defineCall) ->
         defArgs = defineCall.get('arguments')
         if defArgs.count() is 1
             return []
-        scriptDeps = defArgs.get([0, 'elements']).map (x) -> m.get(x, 'value')
-        scriptDepNames = defArgs.get([1, 'params']).map (x) -> m.get(x, 'name')
+        scriptDeps = defArgs.get([0, 'elements']).pluck 'value'
+        scriptDepNames = defArgs.get([1, 'params']).pluck 'name'
         requires = _.map _.zip(scriptDepNames, scriptDeps), (x) -> makeRequireCall(x[0], x[1])
         requires = _.map requires, (x) -> x.val()
         requires = m.into m.vector(), requires
@@ -221,7 +223,22 @@ unAmd = do ->
         bodyIndex = defArgs.count() - 1
         defArgs.get [bodyIndex, 'body', 'body']
 
-    (src) ->
+    minimal = (src) ->
+        t = AST(src)
+        defineCall = getDefineCall(t)
+        dependencies = getDefinedDependencies(defineCall)
+        mainBody = getDefineBody(defineCall)
+        lastBody = mainBody.get mainBody.lastIndex()
+        if lastBody.get('type') isnt 'ReturnStatement'
+            exports = null
+        else
+            exports = swapReturn lastBody
+        return {
+            i: AST(m.intoArray(dependencies)),
+            o: exports
+        }
+
+    output = (src) ->
         t = AST(src)
         defineCall = getDefineCall(t)
         dependencies = getDefinedDependencies(defineCall)
@@ -235,6 +252,13 @@ unAmd = do ->
         mainBody = mainBody.prepend(useStrict().val())    
         mainBody.toProgram()
 
+    _.extend output, {
+        getDefinedDependencies: getDefinedDependencies
+        getDefineCall: getDefineCall
+        getDefineBody: getDefineBody
+        minimal: minimal
+    }
+    output
 
 
 
@@ -270,35 +294,41 @@ async = require 'async'
 
 
 unAmdText = (fileSrc) ->
-    unAmd(fileSrc).generate {
+    generated = unAmd(fileSrc).generate {
         format:
             indent:
                 style: '    '
         comment: true
     }
+    formatted = jsfmt.format generated, {
+        preset: 'default'
+        indent:
+            value: '    '
+    }
+    formatted
 
 
-src5 = """
-define(['underscore', 'jquery'], function(_, $) {
-    var x = Backbone.Model.extend({
-        foo: function() {
-            this._baz = true;
-        }
-    });
+# src5 = """
+# define(['underscore', 'jquery'], function(_, $) {
+#     var x = Backbone.Model.extend({
+#         foo: function() {
+#             this._baz = true;
+#         }
+#     });
 
-    // this is a comment
-    var y = Backbone.Model.extend({
-        bat: function() {
-            this._bar = true;
-        }
-    });
+#     // this is a comment
+#     var y = Backbone.Model.extend({
+#         bat: function() {
+#             this._bar = true;
+#         }
+#     });
 
-    // this is another comment.
-    return {
-        band: band
-    };
-});
-"""
+#     // this is another comment.
+#     return {
+#         band: band
+#     };
+# });
+# """
 
 doTest = do ->
  
@@ -332,12 +362,12 @@ doTest = do ->
             async.each scripts, handleFile, (err) ->
                 cb null
 
-doTest './tmp/src', (err) ->
-    log '{done}'
+# doTest './tmp/src', (err) ->
+#     log '{done}'
 
 
-
-
-
-
+module.exports = {
+    unAmd: unAmd
+    AST: AST
+}
 
