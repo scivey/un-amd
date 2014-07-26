@@ -29,7 +29,14 @@ errNone = ->
     throw new Error('not implemented')
 
 
+isGlobalCtx = do ->
+    _ctx = this
+    (test) ->
+        test is _ctx
+
 Tree = (val) ->
+    if isGlobalCtx(this)
+        return new Tree(val)
     @_isTree = true
     if not val
         val = m.hashMap()
@@ -91,6 +98,9 @@ Tree::count = ->
         return 1
     m.count(v)
 
+Tree::lastIndex = ->
+    @count() - 1
+
 Tree::slice = (i, j) ->
     errNone()
 
@@ -112,7 +122,7 @@ Tree::filter = (pred) ->
     errNone()
 
 Tree::map = (mapFn) ->
-    errNone()
+    m.cljToJs(m.map mapFn, @val())
 
 Tree::equals = (other) ->
     ownVal = @val()
@@ -128,6 +138,19 @@ Tree::traverseLimit = (depth, fns) ->
 Tree::children = ->
     @lift traversal.getChildNodes(@val())
 
+Tree::prepend = (val) ->
+    v = @val()
+    if m.isMap(v)
+        v = m.vector v
+    result = m.cons val, v
+    @lift result
+
+Tree::append = (val) ->
+    v = @val()
+    if m.isMap(v)
+        v.m.vector(v)
+    result = m.conj v, val
+    @lift result
 
 module.exports = {
     Tree: Tree

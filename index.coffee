@@ -2,7 +2,7 @@ m = require './lib/mWrap'
 _ = require 'lodash'
 utils = require './lib/utils'
 traversal = require './lib/traversal'
-{log} = utils
+{log, inspect} = utils
 {Tree} = require './lib/tree'
 esprima = require 'esprima'
 escodegen = require 'escodegen'
@@ -157,5 +157,63 @@ define(['underscore', 'jquery', 'backbone'], function(_, $, Backbone) {
 # yy.inspect()
 # tt.inspect()
 
-t = new Tree(src2)
+exportStatement = do ->
+    expSrc = """
+        module.exports = {
+            Thing1: Thing1,
+            Thing2: Thing2
+        };
+    """
+    exp = Tree(mparse(expSrc))
+    exp = exp.get('body').nth(0)
+    ->
+        exp
+
+t = Tree(mparse(src2))
 t.inspect()
+
+swapReturn = (retStmt) ->
+    ret = Tree(retStmt)
+    o = exportStatement()
+        .replace(['expression', 'right'], (x) -> ret.get('argument').val())
+    o.inspect()
+    o
+
+makeRequireCall = do ->
+    baseSrc = "var VARIABLE = require('MODULE');"
+    base = Tree(mparse(baseSrc)).get('body').nth(0)
+    (varName, modName) ->
+        base.traverse (x) ->
+            if m.get(x, 'name') is 'VARIABLE'
+                return m.assoc(x, 'name', varName)
+            else if m.get(x, 'value') is 'MODULE'
+                mapped = m.assoc(x, 'value', modName)
+                return m.assoc(mapped, 'raw', "'#{modName}'")
+
+t2 = t.traverse (x) ->
+    if h.isType.retStmt(x)
+        return swapReturn(x).val()
+        # return exportStatement().val()
+
+t3 = t.find( (x) -> 
+    if h.isType.callExpr(x)
+        if m.getX(x, 'callee.name') is 'define'
+            return true
+    ).nth(0)
+
+
+scriptDeps = t3.get(['arguments', 0, 'elements']).map (x) -> m.get(x, 'value')
+scriptDepNames = t3.get(['arguments', 1, 'params']).map (x) -> m.get(x, 'name')
+requires = _.map _.zip(scriptDepNames, scriptDeps), (x) -> makeRequireCall(x[0], x[1])
+requires = _.map requires, (x) -> x.val()
+requires = m.into m.vector(), requires
+
+reqs = Tree(requires)
+reqs.inspect()
+
+scriptBody = t3.get ['arguments', 1, 'body', 'body']
+scriptBody.inspect()
+zz = scriptBody.replace (scriptBody.count() - 1), -> "ZAP"
+zz.inspect()
+
+# scriptBody.inspect()
