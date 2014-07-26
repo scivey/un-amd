@@ -137,39 +137,6 @@ doUnAmd = (src) ->
     }
     return formatted
 
-
-src5 = """
-'use strict';
-define(['underscore', 'jquery'], function(_, $) {
-    var x = Backbone.Model.extend({
-        foo: function() {
-            this._baz = true;
-        }
-    });
-    // this is a comment
-    var y = Backbone.Model.extend({
-        bat: function() {
-            this._bar = true;
-        }
-    });
-
-    var AModel = Backbone.Model.extend({
-        setBad: function() {
-            // is this a good idea??
-            this._isGood = false;
-        },
-        getGoodness: function() {
-            return this._isGood;
-        }
-    });
-    return {
-        band: band
-    };
-});
-"""
-
-rocspect rocambole.parse(src5).body
-
 module.exports = {
     doUnAmd: doUnAmd
 }
