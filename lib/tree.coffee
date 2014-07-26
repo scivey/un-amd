@@ -35,7 +35,9 @@ Tree = (val) ->
         val = m.hashMap()
     else if utils.isSimple(val)
         val = m.hashMap()
-    @_val = m.jsToClj(val)
+    else
+        val = m.jsToClj(val)
+    @_val = val
     this
 
 Tree.isTree = (x) ->
@@ -48,12 +50,6 @@ Tree.valIfTree = (x) ->
 
 Tree::val = ->
     @_val
-
-Tree::_firstVal = ->
-    o = @first().val()
-    if isSeq(o)
-        return m.nth o, 0
-    o
 
 Tree::jsVal = ->
     m.cljToJs @val()
@@ -71,8 +67,8 @@ Tree::get = (k) ->
 
 Tree::assoc = (k, v) ->
     v = processAssocVal(v)
-    val = m.assocX @val(), k, v
-    @lift val
+    result = m.assocX @val(), k, v
+    @lift result
 
 Tree::replace = (k, fn) ->
     origVal = Tree.valIfTree @get(k)
@@ -93,7 +89,7 @@ Tree::count = ->
     v = @val()
     if m.isMap(v)
         return 1
-    m.count(val)
+    m.count(v)
 
 Tree::slice = (i, j) ->
     errNone()
@@ -102,7 +98,15 @@ Tree::remove = (k) ->
     errNone()
 
 Tree::find = (pred) ->
-    errNone()
+    results = m.vector()
+    @traverse (node, parent) ->
+        if pred(node, parent)
+            results = m.conj results, node
+        return
+    @lift results
+
+Tree::hasDeep = (pred) ->
+    @find(pred).count() isnt 0
 
 Tree::filter = (pred) ->
     errNone()
@@ -125,9 +129,7 @@ Tree::children = ->
     @lift traversal.getChildNodes(@val())
 
 
-
-
 module.exports = {
     Tree: Tree
 }
-    
+

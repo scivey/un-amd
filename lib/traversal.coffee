@@ -2,18 +2,11 @@ m = require './mWrap'
 _ = require 'lodash'
 utils = require './utils'
 
-eachVal = (aMap, fn) ->
-    m.each aMap, (kv) ->
-        key = m.nth kv, 0
-        val = mnth kv, 1
-        fn()
-
 isSeq = (x) ->
     m.isVector(x) or m.isList(x)
 
 mapper = (x, fn) ->
     m.map fn, x
-
 
 mValMap = (aMap, fn) ->
     result = aMap
@@ -29,7 +22,6 @@ eachVal = (aMap, fn) ->
         val = m.nth kv, 1
         fn(val)
 
-
 t = {}
 
 t.mapType = (aMap, fns, parent, maxDepth, currentDepth) ->
@@ -43,7 +35,6 @@ t.mapType = (aMap, fns, parent, maxDepth, currentDepth) ->
             result = m.assoc result, key, newVal
     result
 
-
 t.listType = (aList, fns, parent, maxDepth, currentDepth) ->
     parent = parent or aList
     result = mapper aList, (val) ->
@@ -52,7 +43,6 @@ t.listType = (aList, fns, parent, maxDepth, currentDepth) ->
             newVal = val
         newVal
     result
-
 
 t.visitOneFn = (val, fn, parent) ->
     result = fn(val, parent)
@@ -123,10 +113,13 @@ getChildNodes = (aNode) ->
         else if isSeq(val)
             mas = mFilt val, (x) ->
                 m.isMap(x)
-            console.log('mas', mas)
             results = m.into results, mas
     results
 
+getSiblingNodes = (aNode, nodeParent) ->
+    parentChildren = getChildNodes(nodeParent)
+    mFilt parentChildren, (el) ->
+        not m.equals(el, aNode)
 
 isNode = (x) ->
     _.isObject(x) and m.isMap(x)
@@ -140,4 +133,5 @@ module.exports = {
     traverseFiltered: traverseFiltered
     traverseObjNodes: traverseObjNodes
     getChildNodes: getChildNodes
+    getSiblingNodes: getSiblingNodes
 }
