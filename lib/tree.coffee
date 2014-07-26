@@ -29,13 +29,9 @@ errNone = ->
     throw new Error('not implemented')
 
 
-isGlobalCtx = do ->
-    _ctx = this
-    (test) ->
-        test is _ctx
 
 Tree = (val) ->
-    if isGlobalCtx(this)
+    if utils.isGlobalCtx(this)
         return new Tree(val)
     @_isTree = true
     if not val
@@ -62,7 +58,7 @@ Tree::jsVal = ->
     m.cljToJs @val()
 
 Tree::lift = (x) ->
-    return new Tree(x)
+    return new @constructor(x)
 
 Tree::inspect = ->
     m.inspect @val()

@@ -6,35 +6,43 @@ traversal = require './lib/traversal'
 {Tree} = require './lib/tree'
 esprima = require 'esprima'
 escodegen = require 'escodegen'
-
-ctx =
-    a:
-        x: 10
-        y: 5
-    b: 17
-    c:
-        q:
-            r: 10
-            s: 7
-        g: 3
-    d:
-        j: 3
-        f: 'e'
-    e2: [37, {zap: 2}]
-    f2: [9, 3, 2]
-
+jsfmt = require 'jsfmt'
 
 mparse = (src) ->
     m.cljToJs(esprima.parse(src))
 
 mgen = (tree) ->
-    escodegen.generate m.jsToClj(tree)
+    tree = Tree.valIfTree(tree)
+    escodegen.generate m.cljToJs(tree)
 
 nSplit = (n, aList) ->
     _.chain(_.range(0, aList.length))
         .filter( (el) -> (el % n) is 0 )
         .map( (el) -> aList.slice(el, el + n) )
         .value()
+
+AST = (tree) ->
+    if utils.isGlobalCtx(this)
+        return new AST(tree)
+    if _.isString(tree)
+        return AST.parse(tree)
+    if AST.isAST(tree)
+        return tree
+    @_isAST = true
+    Tree.apply(this, [tree])
+
+AST.isAST = (x) ->
+    _.isObject(x) and x._isAST
+
+AST.valIfTree = Tree.valIfTree
+AST.isTree = Tree.isTree
+
+_.extend AST.prototype, Tree.prototype
+
+
+AST.parse = (src) ->
+    val = mparse(src)
+    return new AST(val)
 
 h = do ->
     types = [
@@ -78,37 +86,147 @@ h = do ->
             utils.includes('Statement', m.get(node, 'type'))
     }
 
+
     return {
         isType: typePreds
     }
 
 
-src = """
-var x = 10;
-var y = 19 / 2;
-var z = x + y;
-var plonk = function(a, b, c) {
-    return a + b + c;
-};
-var qq = plonk(x, y, z);
-var sea = {
-    nano: 'foo',
-    doThing: function(x) {
-        console.log(x);
-    }
-};
-sea.zap.why = 'plew!';
-function mult(m1, m2) {
-    return m1 * m2;
-};
-function isMult(aa, bb) {
-    if (mult(aa, bb) > 50) {
-        return true;
-    } else {
-        return false;
-    }
-};
-"""
+_.extend h, do ->
+
+    xform = {}
+    xform.statementsToProg = do ->
+        prog = AST m.hashMap("type", "Program", "body", null)
+        (stmts) ->
+            stmts = AST.valIfTree(stmts)
+            prog.assoc 'body', stmts
+
+    xform.stmtToProg = (stmt) ->
+        stmts = m.vector AST.valIfTree(stmt)
+        xform.statementsToProg stmts
+
+    xform.exprToStmt = do ->
+        exprStatement = AST m.hashMap("type", "ExpressionStatement", "expression", null)
+        (expr) ->
+            expr = AST.valIfTree(expr)
+            exprStatement.assoc 'expression', expr
+
+    xform.exprToProg = (x) ->
+        x = AST.valIfTree(x)
+        xform.stmtToProg xform.exprToStmt(x)
+
+    xform.xToProg = (x) ->
+        x = AST.valIfTree(x)
+        unless m.isMap(x)
+            return xform.statementsToProg(x)
+        if h.isType.prog(x)
+            return x
+        if h.isType.expr(x)
+            return xform.stmtToProg(xform.exprToStmt(x))
+        if h.isType.stmt(x)
+            return xform.stmtToProg(x)
+    return {xform: xform}
+
+
+_.extend h, do ->
+
+    make = {}
+    make.lit = do ->
+        lit = AST m.hashMap('type', 'Literal', 'value', null, 'raw', null)
+        makeNumLit = (x) ->
+            lit.assoc('value', x).assoc('raw', "#{x}")
+        makeStrLit = (x) ->
+            lit.assoc('value', x).assoc('raw', "'#{x}'")
+        (x) ->
+            if _.isNumber(x)
+                makeNumLit(x)
+            else
+                makeStrLit(x)
+
+    return {make: make}
+
+
+exportStatement = do ->
+    expSrc = """
+        module.exports = {
+            Thing1: Thing1,
+            Thing2: Thing2
+        };
+    """
+    exp = AST(expSrc).get('body').nth(0)
+    ->
+        exp
+
+swapReturn = (retStmt) ->
+    ret = AST(retStmt)
+    o = exportStatement()
+        .replace(['expression', 'right'], (x) -> ret.get('argument').val())
+    o
+
+makeRequireCall = do ->
+    baseSrc = "var VARIABLE = require('MODULE');"
+    base = Tree(mparse(baseSrc)).get('body').nth(0)
+    (varName, modName) ->
+        base.traverse (x) ->
+            if m.get(x, 'name') is 'VARIABLE'
+                return m.assoc(x, 'name', varName)
+            else if m.get(x, 'value') is 'MODULE'
+                return m.assoc m.assoc(x, 'value', modName), 'raw', "'#{modName}'"
+
+useStrict = do ->
+    stmt = h.xform.exprToStmt h.make.lit('use strict')
+    ->
+        stmt
+
+AST::generate = ->
+    mgen @val()
+
+AST::genFmt = ->
+    jsfmt.format @generate()
+
+AST::toProgram = ->
+    h.xform.xToProg @val()
+
+
+
+
+
+unAmd = do ->
+
+    getDefinedDependencies = (defineCall) ->
+        scriptDeps = defineCall.get(['arguments', 0, 'elements']).map (x) -> m.get(x, 'value')
+        scriptDepNames = defineCall.get(['arguments', 1, 'params']).map (x) -> m.get(x, 'name')
+        requires = _.map _.zip(scriptDepNames, scriptDeps), (x) -> makeRequireCall(x[0], x[1])
+        requires = _.map requires, (x) -> x.val()
+        requires = m.into m.vector(), requires
+        requires
+
+    getDefineCall = (tree) ->
+        tree.find( (x) ->
+            if h.isType.callExpr(x)
+                if m.getX(x, 'callee.name') is 'define'
+                    return true
+        ).nth(0)
+
+    getDefineBody = (defineCall) ->
+        defineCall.get ['arguments', 1, 'body', 'body']
+
+    (src) ->
+        t = AST(src)
+        defineCall = getDefineCall(t)
+        dependencies = getDefinedDependencies(defineCall)
+        mainBody = getDefineBody(defineCall)
+        mainBody = mainBody.replace mainBody.lastIndex(), (retStmt) ->
+            swapReturn(retStmt)
+
+        m.each dependencies, (r) ->
+            mainBody = mainBody.prepend r
+
+        mainBody = mainBody.prepend(useStrict().val())    
+        mainBody.toProgram()
+
+
+
 
 src2 = """
 define(['underscore', 'jquery', 'backbone'], function(_, $, Backbone) {
@@ -133,87 +251,6 @@ define(['underscore', 'jquery', 'backbone'], function(_, $, Backbone) {
 """
 
 
+good = unAmd(src2)
 
-# tt = new Tree(mparse(src))
-# # tt.inspect()
-# x = tt.get 'body'
-# # tt.get('body').inspect().nth(1).inspect()
-
-
-# yy = tt.traverse (x) ->
-#     if h.isType.id(x)
-#         if m.get(x, 'name') is 'y'
-#             return m.assoc(x, 'name', 'theta')
-
-
-# y2 = tt.find (x, y) ->
-#     if h.isType.funcExpr(x)
-#         t2 = new Tree(x)
-#         t2.hasDeep (el) -> m.get(el, 'name') is 'console'
-
-
-# y2.inspect()
-# # yy.find( (x) -> h.isType.id(x) ).inspect()
-# yy.inspect()
-# tt.inspect()
-
-exportStatement = do ->
-    expSrc = """
-        module.exports = {
-            Thing1: Thing1,
-            Thing2: Thing2
-        };
-    """
-    exp = Tree(mparse(expSrc))
-    exp = exp.get('body').nth(0)
-    ->
-        exp
-
-t = Tree(mparse(src2))
-t.inspect()
-
-swapReturn = (retStmt) ->
-    ret = Tree(retStmt)
-    o = exportStatement()
-        .replace(['expression', 'right'], (x) -> ret.get('argument').val())
-    o.inspect()
-    o
-
-makeRequireCall = do ->
-    baseSrc = "var VARIABLE = require('MODULE');"
-    base = Tree(mparse(baseSrc)).get('body').nth(0)
-    (varName, modName) ->
-        base.traverse (x) ->
-            if m.get(x, 'name') is 'VARIABLE'
-                return m.assoc(x, 'name', varName)
-            else if m.get(x, 'value') is 'MODULE'
-                mapped = m.assoc(x, 'value', modName)
-                return m.assoc(mapped, 'raw', "'#{modName}'")
-
-t2 = t.traverse (x) ->
-    if h.isType.retStmt(x)
-        return swapReturn(x).val()
-        # return exportStatement().val()
-
-t3 = t.find( (x) -> 
-    if h.isType.callExpr(x)
-        if m.getX(x, 'callee.name') is 'define'
-            return true
-    ).nth(0)
-
-
-scriptDeps = t3.get(['arguments', 0, 'elements']).map (x) -> m.get(x, 'value')
-scriptDepNames = t3.get(['arguments', 1, 'params']).map (x) -> m.get(x, 'name')
-requires = _.map _.zip(scriptDepNames, scriptDeps), (x) -> makeRequireCall(x[0], x[1])
-requires = _.map requires, (x) -> x.val()
-requires = m.into m.vector(), requires
-
-reqs = Tree(requires)
-reqs.inspect()
-
-scriptBody = t3.get ['arguments', 1, 'body', 'body']
-scriptBody.inspect()
-zz = scriptBody.replace (scriptBody.count() - 1), -> "ZAP"
-zz.inspect()
-
-# scriptBody.inspect()
+console.log good.genFmt()

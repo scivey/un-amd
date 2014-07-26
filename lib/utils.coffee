@@ -60,6 +60,11 @@ h.keyString = (x) ->
     parts
 
 
+h.isGlobalCtx = do ->
+    _ctx = this
+    (test) ->
+        test is _ctx
+
 output = h.extend h, {
     kamelKey: kamelKey
     inspect: inspect
