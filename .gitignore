@@ -1,6 +1,6 @@
 node_modules
 *.log
-mori-tree.sublime-project
-mori-tree.sublime-workspace
+*.sublime-project
+*.sublime-workspace
 tmp
-t2.coffee
+
