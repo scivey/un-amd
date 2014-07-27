@@ -17,6 +17,7 @@
     "rocambole": "~0.3.6",
     "esformatter": "~0.4.1",
     "rocambole-token": "~1.2.1",
-    "rocambole-node": "~1.0.0"
+    "rocambole-node": "~1.0.0",
+    "underscore.string": "~2.3.3"
   }
 }
