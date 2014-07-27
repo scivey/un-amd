@@ -3,7 +3,13 @@ un-amd
 
 Convert AMD-style javascript modules to CommonJS, preserving comments and whitespace in the original code.
 
-Currently unstable -- not submitted to NPM yet.
+Currently beta, but the signature and behavior of the main exported `unAmd` function is unlikely to change.  More of the underlying functionality will be exposed at some point.
+
+Installation
+=================
+
+    npm install un-amd
+
 
 Example
 =================
