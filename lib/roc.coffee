@@ -1,7 +1,7 @@
 _ = require 'lodash'
 rocambole = require 'rocambole'
-m = require './lib/mWrap'
-utils = require './lib/utils'
+m = require './mWrap'
+utils = require './utils'
 {inspect, log} = utils
 esformatter = require 'esformatter'
 escodegen = require 'escodegen'
@@ -112,31 +112,8 @@ getBodySrc = (src) ->
     defBodyTokens = getDefTokens rocTree
     joinTokens defBodyTokens
 
-
-
-transformAmd = (src) ->
-    {unAmd, AST} = require './index'
-    importExport = unAmd.minimal(src)
-
-    requireSrc = importExport.i.toProgram().generate()
-    if importExport.o
-        exportSrc = importExport.o.toProgram().generate()
-    else
-        exportSrc = ''
-
-    preDefineSrc = getPreDefineSrc(src)
-    bodySrc = getBodySrc(src)
-
-    return [preDefineSrc, requireSrc, bodySrc, exportSrc].join('\n')
-
-doUnAmd = (src) ->
-    xformed = transformAmd(src)
-    formatted = esformatter.format xformed, {
-        indent:
-            value: '    '
-    }
-    return formatted
-
 module.exports = {
-    doUnAmd: doUnAmd
+    getPreDefineSrc: getPreDefineSrc
+    getBodySrc: getBodySrc
 }
+
