@@ -1,2 +1,6 @@
 asyncProc.*
 *.coffee
+lib/*.coffee
+tmp
+*.log
+
